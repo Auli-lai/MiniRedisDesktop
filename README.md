@@ -1,97 +1,156 @@
-# mini-redis — 兼容 Redis 协议的内存数据库
+# MiniRedis Desktop Manager
 
-基于 C++11 从零构建的 Redis 兼容服务器。使用 **跳表** 实现 Sorted Set，**epoll** 单线程事件循环，支持 **5 种核心数据结构**、**键过期** 和 **AOF 持久化**。
+基于 **Qt5 + C++11** 的 Redis 兼容数据管理桌面客户端。一键启动内嵌 mini_redis 服务器，树形浏览 Key，支持 String/List/Hash/Set/ZSet 五种数据类型的可视化编辑。
+
+---
+
+## 预览
+
+```
+┌───────────────────────────────────────────────────────────┐
+│  File  View  Help                                         │
+│  [▶ Start] [■ Stop] [🔗 Connect] [⏻ Disconnect] [🔄 Refresh]│
+├──────────────┬────────────────────────────────────────────┤
+│  Key 浏览器   │  [Value] [Stats]                            │
+│              │                                             │
+│  🔍 user:*   │  Key: user:1001   Type: Hash   TTL: 86400  │
+│              │  ─────────────────────────────────────────  │
+│  📁 DB0      │  Field          Value                       │
+│   ├─ user:1  │  name           Alice                       │
+│   ├─ user:2  │  age            25                          │
+│   ├─ cache:a │  active         true                        │
+│   ├─ sess:x  │                                             │
+│   └─ cfg:y   │  [💾 Save] [🗑 Delete] [🔄 Refresh]         │
+├──────────────┴────────────────────────────────────────────┤
+│  > SET mykey hello                                         │
+│  +OK                                                       │
+│  > GET mykey                                               │
+│  $5                                                        │
+│  hello                                                     │
+├────────────────────────────────────────────────────────────┤
+│  ● 已连接 127.0.0.1:54321                      DB0         │
+└───────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## 特性
 
-- **RESP 协议兼容** — 可用 `redis-cli` 直接连接操作
-- **5 种数据结构** — String、List、Hash、Set、Sorted Set（跳表实现）
-- **键过期** — 惰性删除 + 定期删除，支持 EXPIRE/TTL 命令
-- **AOF 持久化** — 写命令日志，重启恢复数据
-- **单线程 epoll** — 同 Redis 设计，避免锁竞争和上下文切换
-- **连接超时** — 最小堆定时器，60 秒自动关闭空闲连接
-- **优雅关闭** — SIGINT/SIGTERM 安全退出
+| 功能 | 说明 |
+|------|------|
+| 🔌 一键启动 | 内嵌 mini_redis 服务器，点击即用 |
+| 🌲 Key 浏览器 | 树形展示所有 Key，按 DB 分组，支持通配符搜索 |
+| 📝 值编辑器 | 5 种数据类型各有专用编辑器，所见即所得 |
+| 💻 命令控制台 | 类 redis-cli 交互，支持命令历史与自动补全 |
+| 📊 性能仪表盘 | INFO 命令可视化，定时自动刷新 |
+| 🎨 深色主题 | 控制台暗色风格，贴近专业开发工具 |
 
 ---
 
 ## 快速开始
 
+### 编译环境
+
+- **系统:** Linux (Ubuntu 20.04+) / Windows 11 WSL2 (WSLg)
+- **编译器:** g++ 4.8+ / clang 3.3+ (C++11)
+- **依赖:** Qt 5.12+ (Widgets + Network), CMake 3.10+
+
+### 安装依赖
+
 ```bash
-# 编译
-cd mini_redis
-mkdir build && cd build
+# Ubuntu / Debian
+sudo apt update
+sudo apt install qtbase5-dev cmake g++ make
+
+# 验证 Qt 安装
+qmake --version
+```
+
+### 编译
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/Auli-lai/Mini_Redis.git
+cd Mini_Redis
+
+# 2. 编译 GUI 客户端
+cd ../MiniRedisDesktop
+mkdir -p build && cd build
 cmake .. && make -j$(nproc)
 
-# 启动
-./mini_redis           # 默认 6379 端口
-./mini_redis 6380      # 自定义端口
+```
 
-# 连接
-redis-cli -p 6379
+### 运行
+
+```bash
+#GUI 自动启动内嵌 server
+cd bin/
+./MiniRedisDesktop
+```
+
+### WSLg (Windows 11)
+
+Windows 11 WSL2 内置 WSLg，在 WSL 终端中编译运行即可，GUI 窗口自动出现在 Windows 桌面：
+
+```bash
+# 在 WSL Ubuntu 中
+cd /mnt/e/Vscode\ projects/MiniRedisDesktop
+mkdir -p build && cd build
+cmake .. && make -j$(nproc)
+cd bin/
+./MiniRedisDesktop
 ```
 
 ---
 
-## 支持的命令
+## 项目结构
 
-### String
-| 命令 | 说明 |
-|------|------|
-| SET key value | 设置键值 |
-| GET key | 获取值 |
-| DEL key [key ...] | 删除键 |
-| EXISTS key | 检查键是否存在 |
-| KEYS pattern | 查找匹配的键 |
-
-### List
-| 命令 | 说明 |
-|------|------|
-| LPUSH key value [value ...] | 左侧插入 |
-| RPUSH key value [value ...] | 右侧插入 |
-| LPOP key | 左侧弹出 |
-| RPOP key | 右侧弹出 |
-| LRANGE key start stop | 范围查询 |
-| LLEN key | 列表长度 |
-
-### Hash
-| 命令 | 说明 |
-|------|------|
-| HSET key field value | 设置字段 |
-| HGET key field | 获取字段 |
-| HDEL key field | 删除字段 |
-| HGETALL key | 获取全部字段 |
-| HEXISTS key field | 字段是否存在 |
-
-### Set
-| 命令 | 说明 |
-|------|------|
-| SADD key member [member ...] | 添加成员 |
-| SREM key member | 删除成员 |
-| SMEMBERS key | 获取全部成员 |
-| SISMEMBER key member | 是否成员 |
-| SCARD key | 集合大小 |
-
-### Sorted Set
-| 命令 | 说明 |
-|------|------|
-| ZADD key score member | 添加成员 |
-| ZREM key member | 删除成员 |
-| ZSCORE key member | 获取分数 |
-| ZRANGE key start stop [WITHSCORES] | 范围查询 |
-| ZRANK key member | 获取排名 |
-| ZCARD key | 有序集合大小 |
-
-### 其他
-| 命令 | 说明 |
-|------|------|
-| EXPIRE key seconds | 设置过期时间 |
-| TTL key | 查看剩余时间 |
-| PING | 心跳检测 |
-| DBSIZE | 键总数 |
-| FLUSHDB | 清空数据库 |
-| INFO | 服务器信息 |
+```
+MiniRedisDesktop/
+├── CMakeLists.txt
+├── README.md
+├── include
+│   ├── console_panel.h
+│   ├── key_browser.h
+│   ├── log.h
+│   ├── mainwindow.h
+│   ├── redis_client.h
+│   ├── resp_codec.h
+│   ├── server_manager.h
+│   ├── stats_dashboard.h
+│   └── value_viewer.h
+├── mini_redis
+│   ├── CMakeLists.txt
+│   ├── include
+│   │   ├── command.h
+│   │   ├── db.h
+│   │   ├── epoll.h
+│   │   ├── log.h
+│   │   ├── queue.h
+│   │   ├── resp_parser.h
+│   │   ├── server.h
+│   │   └── timer.h
+│   └── src
+│       ├── command.cpp
+│       ├── db.cpp
+│       ├── epoll.cpp
+│       ├── log.cpp
+│       ├── main.cpp
+│       ├── resp_parser.cpp
+│       ├── server.cpp
+│       └── timer.cpp
+├── resources
+└── src
+    ├── console_panel.cpp
+    ├── key_browser.cpp
+    ├── log.cpp
+    ├── main.cpp
+    ├── mainwindow.cpp
+    ├── redis_client.cpp
+    ├── server_manager.cpp
+    ├── stats_dashboard.cpp
+    └── value_viewer.cpp
+```
 
 ---
 
@@ -99,46 +158,13 @@ redis-cli -p 6379
 
 | 层面 | 实现 |
 |------|------|
-| 网络模型 | 单线程 epoll ET + EPOLLONESHOT |
-| 协议解析 | RESP 协议状态机 |
-| Sorted Set | 跳表（随机层高，O(log n) 增删查） |
-| 键过期 | 惰性删除 + 定期扫描 |
-| 持久化 | AOF 追加日志 |
-| 定时器 | 最小堆，O(log n) 管理连接超时 |
+| 网络模型 | Qt 异步 QTcpSocket，事件驱动，不阻塞 UI |
+| 协议解析 | 手写 RESP 编解码器，借鉴 mini_redis 解析器设计 |
+| 进程管理 | QProcess 管理 server 子进程，自动端口检测 |
+| UI 架构 | 信号槽解耦，各组件独立可测试 |
+| 数据编辑 | QStackedWidget 按类型切换编辑器，命令构造自动 RESP 编码 |
 
 ---
-
-## 项目结构
-
-```
-mini_redis/
-├── CMakeLists.txt
-├── README.md
-├── include/
-│   ├── server.h          # TCP 服务器
-│   ├── epoll.h           # epoll 事件循环
-│   ├── resp_parser.h     # RESP 协议解析器
-│   ├── db.h              # 数据库引擎 + 跳表
-│   ├── command.h         # 命令路由表
-│   ├── timer.h           # 最小堆定时器
-│   ├── log.h             # 日志系统
-│   └── queue.h           # 线程安全队列
-└── src/
-    ├── main.cpp
-    ├── server.cpp
-    ├── epoll.cpp
-    ├── resp_parser.cpp
-    ├── db.cpp
-    ├── command.cpp
-    ├── timer.cpp
-    └── log.cpp
-```
-
-## 编译要求
-
-- **系统:** Linux (epoll)
-- **编译器:** g++ 4.8+ / clang 3.3+ (C++11)
-- **工具:** CMake 3.10+, make
 
 ## 许可证
 
